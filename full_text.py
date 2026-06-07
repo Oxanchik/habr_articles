@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 
 KEYWORDS = ['дизайн', 'фото', 'web', 'python']
 
-URL = 'https://habr.com/ru/all/'
+URL = 'https://habr.com/ru/articles/'
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
 }
@@ -28,22 +28,26 @@ for article in soup.select('article.tm-articles-list__item'):
     if not title_el:
         continue
 
-    title = title_el.text.replace('\n', '').strip()
+    title = title_el.text.replace('\n', ' ').strip()
     link = urljoin(URL, title_el.get('href', ''))
 
     time_el = article.select_one('time')
     date = time_el.get('datetime', '').strip() if time_el else ''
 
-    preview_parts = [title]
-
-    preview_block = article.select_one('.article-formatted-body')
-    if preview_block:
-        preview_parts.append(preview_block.text.replace('\n', '').strip())
-
-    tags = article.select('.tm-publication-hub__link span, .tm-publication-hub__link')
-    preview_parts.extend(tag.text.replace('\n', '').strip() for tag in tags if tag.get_text(strip=True))
-
-    preview_text = ' '.join(preview_parts).lower()
+    preview_block = article.select_one('.article-formatted-body') or article
+    preview_text = preview_block.text.replace('\n', ' ').strip().lower()
 
     if has_keywords(preview_text):
         print(f'{date} – {title} – {link}')
+        continue
+
+    if link:
+        article_page = session.get(link, timeout=20)
+        article_page.raise_for_status()
+        article_soup = BeautifulSoup(article_page.text, 'html.parser')
+
+        full_text_block = article_soup.select_one('.article-formatted-body') or article_soup.select_one('.tm-article-body')
+        full_text = full_text_block.text.replace('\n', ' ').strip().lower() if full_text_block else article_soup.text.replace('\n', ' ').strip().lower()
+
+        if has_keywords(full_text):
+            print(f'{date} – {title} – {link}')

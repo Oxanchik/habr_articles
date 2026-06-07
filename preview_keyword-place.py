@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 
 KEYWORDS = ['дизайн', 'фото', 'web', 'python']
 
-URL = 'https://habr.com/ru/all/'
+URL = 'https://habr.com/ru/articles/'
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
 }
@@ -14,9 +14,9 @@ session.headers.update(HEADERS)
 
 keywords = [kw.lower() for kw in KEYWORDS]
 
-def has_keywords(text: str) -> bool:
+def has_keywords(text: str):
     text = text.lower()
-    return any(kw in text for kw in keywords)
+    return [kw for kw in keywords if kw in text]
 
 page = session.get(URL, timeout=20)
 page.raise_for_status()
@@ -43,7 +43,22 @@ for article in soup.select('article.tm-articles-list__item'):
     tags = article.select('.tm-publication-hub__link span, .tm-publication-hub__link')
     preview_parts.extend(tag.text.replace('\n', '').strip() for tag in tags if tag.get_text(strip=True))
 
+    tags_text = ' '.join(tag.text.replace('\n', '').strip() for tag in tags if tag.get_text(strip=True))
+    if tags_text:
+        preview_parts.append(tags_text)
     preview_text = ' '.join(preview_parts).lower()
 
-    if has_keywords(preview_text):
-        print(f'{date} – {title} – {link}')
+    fields = [
+        ('заголовок', title),
+        ('превью', preview_text),
+        ('теги', tags_text),
+    ]
+
+    found = []
+    for field_name, field_text in fields:
+        matched = has_keywords(field_text)
+        if matched:
+            found.append(f'{field_name}: {", ".join(matched)}')
+
+    if found:
+        print(f'{date} – {title} – {link} – найдено в: {", ".join(found)}')
